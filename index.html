@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>ACOUSMA</title>
+    <meta name="description" content="Experimental industrial noise synthesizer: an audible presence without a visible explanation." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 8h4l2-5 2 10 2-5' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fragment+Mono&family=Instrument+Sans:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <!-- Lets the browser resolve `import ... from "tone"` without a build step
+         (VS Code Live Server, any static server). Vite ignores this and uses node_modules. -->
+    <script type="importmap">
+      { "imports": { "tone": "./vendor/tone-15.1.22.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>ACOUSMA needs JavaScript and the Web Audio API.</noscript>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

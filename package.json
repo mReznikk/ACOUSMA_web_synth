@@ -1,0 +1,21 @@
+{
+  "name": "acousma",
+  "version": "0.1.0",
+  "description": "ACOUSMA — an experimental industrial noise synthesizer and sequencer for the browser (proof of concept).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "tone": "15.1.22"
+  },
+  "devDependencies": {
+    "vite": "8.3.3"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}
