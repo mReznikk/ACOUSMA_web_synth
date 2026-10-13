@@ -1,4 +1,4 @@
-# Automated audio checks for ULTRA (headless Chromium via Playwright).
+# Automated audio checks (headless Chromium via Playwright).
 # Usage:  npm run build && npm run preview   (in one terminal)
 #         pip install playwright && python -m playwright install chromium
 #         python tests/verify.py http://localhost:4173/
