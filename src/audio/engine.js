@@ -56,7 +56,8 @@ export class Engine {
     this.cutGate = new Tone.Gain(1); // CUT closes this instantly
     this.presetFade = new Tone.Gain(1); // short dip when presets change
     this.masterLevel = new Tone.Gain(Tone.dbToGain(levelToDb(s.master.level)));
-    this.masterLevel.chain(this.presetFade, this.cutGate, this.protection, this.limiter, Tone.getDestination());
+    this.muffle = new Tone.Filter({ type: "lowpass", frequency: 18000, Q: 0.4, rolloff: -12 }); // the tone control for the whole piece (TUNE → Muffle)
+    this.masterLevel.chain(this.presetFade, this.cutGate, this.protection, this.limiter, this.muffle, Tone.getDestination());
 
     // ── Buses ──
     this.synthBus = new Tone.Gain(1);
@@ -123,8 +124,8 @@ export class Engine {
   }
 
   // ── Transport ────────────────────────────────────────────────
-  play() {
-    this.clock.play();
+  play(offset) {
+    this.clock.play(offset);
   }
 
   stop() {
@@ -289,7 +290,7 @@ export class Engine {
       for (const [k, val] of Object.entries(s[id])) if (k !== "pattern") this._applyVoiceParam(id, k, val);
     }
     for (const id of DRUM_IDS) {
-      for (const k of ["level", "mute", "solo", "rate"]) {
+      for (const k of ["level", "pan", "mute", "solo", "rate"]) {
         this._applyChannelParam(id, k, s.drums[id][k], () => k === "rate" && this.drums[id].setRate(s.drums[id].rate));
       }
     }

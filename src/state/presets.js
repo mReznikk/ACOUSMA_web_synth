@@ -239,6 +239,46 @@ const PRESET_SPECS = {
   },
 };
 
+// FOURTH — the opening state of the three-minute piece (working title).
+// Silent: no patterns. The score (src/score/) writes the patterns bar by bar and
+// moves the macro-driven values; this preset only says where everything starts.
+// Tempo 75 BPM makes one 16th step 0.2 s and one bar 3.2 s — one sweep of the display.
+PRESET_SPECS.FOURTH = {
+  tempo: 75,
+  synth1: {
+    wave: "square", pitch: 55, attack: 0.003, release: 0.12, tone: 0.45, level: 0.4, pan: -0.3,
+    mode: "sequence", pattern: synthPattern(),
+  },
+  synth2: {
+    wave: "sine", noiseType: "pink", noiseMix: 0.88, pitch: 740, attack: 0.15, release: 1.3,
+    tone: 0.4, instability: 0.05, level: 0.3, pan: 0.3, mode: "sequence", pattern: synthPattern(),
+  },
+  drums: {
+    thud: { steps: drumRow([]), level: 0.5, rate: 0.85, pan: 0 },
+    crack: { steps: drumRow([]), level: 0.4, rate: 0.92, pan: 0.15 },
+    tick: { steps: drumRow([]), level: 0.12, rate: 1.1, pan: -0.25 },
+    clang: { steps: drumRow([]), level: 0.18, rate: 0.7, pan: 0.35 },
+  },
+  bus: { synthLevel: 1, drumLevel: 1 },
+  master: { level: 1 },
+  fx: {
+    synth: {
+      dist: { drive: 0.05, mix: 0.15, bypass: false },
+      crush: { bits: 8, mix: 0.3, bypass: false },
+      delay: { division: "4n.", delayFeedback: 0.3, mix: 0.2, bypass: true },
+      reverb: { decay: 6, mix: 0.5, bypass: false },
+    },
+    drum: {
+      dist: { drive: 0.3, mix: 0.3, bypass: false },
+      crush: { bits: 10, mix: 0.2, bypass: true },
+      delay: { division: "8n.", delayFeedback: 0.4, mix: 0.25, bypass: false },
+      reverb: { decay: 2.2, mix: 0.3, bypass: false },
+    },
+  },
+  feel: { lateStep: 13, late: 0, jitter: 0 },
+};
+export const OPENING_PRESET = "FOURTH";
+
 export const PRESET_NAMES = Object.keys(PRESET_SPECS);
 
 /** Returns a fresh, complete instrument state for a preset name. */

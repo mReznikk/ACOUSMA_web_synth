@@ -92,14 +92,18 @@ export function baseState() {
       pattern: synthPattern(),
     },
     drums: {
-      thud: { steps: drumRow(), level: 0.8, rate: 1, mute: false, solo: false },
-      crack: { steps: drumRow(), level: 0.6, rate: 1, mute: false, solo: false },
-      tick: { steps: drumRow(), level: 0.45, rate: 1, mute: false, solo: false },
-      clang: { steps: drumRow(), level: 0.45, rate: 1, mute: false, solo: false },
+      thud: { steps: drumRow(), level: 0.8, rate: 1, pan: 0, mute: false, solo: false },
+      crack: { steps: drumRow(), level: 0.6, rate: 1, pan: 0, mute: false, solo: false },
+      tick: { steps: drumRow(), level: 0.45, rate: 1, pan: 0, mute: false, solo: false },
+      clang: { steps: drumRow(), level: 0.45, rate: 1, pan: 0, mute: false, solo: false },
     },
     bus: { synthLevel: 0.8, drumLevel: 0.8 },
     master: { level: 0.6 },
     fx: { synth: fxDefaults(), drum: fxDefaults() },
+    // Micro-timing for PULSE (used by the clock). `late` is how far the pulse on
+    // `lateStep` is pushed later, in steps beyond its place in the pattern (0 = none);
+    // `jitter` is a one-sided drag in seconds. Both are 0 unless a score drives them.
+    feel: { lateStep: 13, late: 0, jitter: 0 },
   };
 }
 
