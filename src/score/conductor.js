@@ -25,6 +25,12 @@ import { seeded } from "../audio/clock.js";
 
 const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
+// MANUAL is the default: nothing plays by itself. Patterns, layers and voices are placed and
+// switched on by hand. The old automatic score is still here: open the page with ?auto=1.
+const MANUAL = typeof location === "undefined" || new URLSearchParams(location.search).get("auto") !== "1";
+const WORD_T0 = S.WORD_CUES.map((c) => c.t0);
+const HARMONY = [["Hollow", 10], ["Rub", 14], ["Tritone", 20], ["Cluster", 26], ["Slip", 31], ["Peak", 40]]; // [name, a bar of the score with that chord]
+
 export function createConductor({ store, engine }) {
   const transport = Tone.getTransport();
   let B = S.B_AUTO;
@@ -42,12 +48,20 @@ export function createConductor({ store, engine }) {
   let bed = null;
   let music = null;
   let voice = null;
+  // manual state
+  const man = [0.3, 0.3, 0.1]; // the three macros, as set by hand
+  const layers = { bed: false, pad: false, lead: false, riff: false };
+  let harmony = 0;
+  let chordBar = -99; // last bar the pad chord was started
+  let cutDone = false;
+  let finishTimer = null;
 
   const hand = { offset: [0, 0, 0], down: [false, false, false], from: [0, 0, 0], since: [0, 0, 0] };
 
   const time = () => (running ? transport.seconds : ended ? endedAt : 0);
-  const base = (T = time()) => S.macroBase(T, B);
-  const effective = (T = time()) => base(T).map((v, i) => clamp(v + hand.offset[i]));
+  const base = (T = time()) => (MANUAL ? man.slice() : S.macroBase(T, B));
+  const effective = (T = time()) => (MANUAL ? man.slice() : base(T).map((v, i) => clamp(v + hand.offset[i])));
+  const hbar = () => HARMONY[harmony][1];
 
   // ── writing ────────────────────────────────────────────────
   function setValue(path, v) {
@@ -89,6 +103,19 @@ export function createConductor({ store, engine }) {
     }
     const T = time();
     applyMacros(effective(T));
+    if (MANUAL) {
+      if (bed && music) {
+        const on = (k, x) => (layers[k] && !cutDone ? x : -80);
+        const C = man[1];
+        bed.set(on("bed", TUNE.bed), on("bed", 0.3 + 0.7 * man[2]) > -80 ? (0.3 + 0.7 * man[2]) * (TUNE.throb / 0.6) : 0);
+        music.setLevels(on("pad", TUNE.pad), on("lead", TUNE.lead + (C - 0.5) * 6), 300 + 700 * man[0], 500 + (TUNE.leadBright - 500) * man[0]);
+        music.setWall(TUNE.wall);
+        music.setRiff(on("riff", TUNE.riff), 220 + (TUNE.riffBright - 220) * (0.3 + 0.7 * man[0]) ** 2);
+      }
+      engine.muffle.frequency.rampTo(TUNE.muffle, 0.1);
+      setValue("master.level", 0.85);
+      return;
+    }
     if (bed && music) {
       const [lv, depth] = S.bedAt(T, B);
       if (lv <= 0.001) bed.set(-80, 0);
@@ -161,6 +188,24 @@ export function createConductor({ store, engine }) {
   // Pitched instruments: called by the clock on every 16th step (bar = score bar, step = 0..15).
   function onMusicStep(bar, step, time) {
     if (!running || !music) return;
+    if (MANUAL) {
+      if (cutDone) return;
+      const hb = hbar(), c = S.chordAt(hb, B);
+      if (step === 0) {
+        bed.setRoot(c.bass, 0.6);
+        setValue("synth1.pitch", c.bass); // the pulse follows the harmony
+        if (layers.pad && (bar - chordBar >= 4 || chordBar < 0 || chordBar > bar)) { music.padChord(c.pad, 4 * S.BAR + 0.4, time); chordBar = bar; }
+      }
+      if (layers.lead) {
+        const ev = S.leadAt(hb, step + 1, B, man[1]);
+        if (ev) music.leadNote(ev.midi, ev.dur, time, ev.vel * 0.7, ev.cents ?? (seeded(bar, step + 99) - 0.5) * 160 * man[2], ev.glide || 0);
+      }
+      if (layers.riff) {
+        const rf = S.riffAt(Math.max(hb, 28), step + 1, B);
+        if (rf) music.riffNote(rf, time);
+      }
+      return;
+    }
     if (step === 0) {
       const ps = S.padStart(bar, B);
       if (ps) music.padChord(ps.notes, ps.seconds, time);
@@ -187,7 +232,11 @@ export function createConductor({ store, engine }) {
       await engine.cut(); // stops the clock too, and flushes delay / reverb tails
     }
     running = false; ended = false; pressed = false; fading = false; endedAt = 0;
+    clearTimeout(finishTimer);
     B = S.B_AUTO;
+    cutDone = false; chordBar = -99;
+    for (const k of Object.keys(layers)) layers[k] = false;
+    S.WORD_CUES.forEach((c, i) => { c.t0 = MANUAL ? Infinity : WORD_T0[i]; });
     mask = new Set(); lastValue = {}; lastRow = {};
     for (let i = 0; i < 3; i++) { hand.offset[i] = 0; hand.down[i] = false; }
     if (engine.started) await engine.fadeForPreset(() => store.replace(loadPreset(OPENING_PRESET)));
@@ -204,26 +253,27 @@ export function createConductor({ store, engine }) {
     at = Math.max(0, Math.min(at, (B - 2) * S.BAR)); // jumping in is allowed before the break only
     hasRun = true;
     running = true;
-    if (at > 0) {
+    if (!MANUAL && at > 0) {
       transport.seconds = at;
       const bar0 = Math.floor(at / S.BAR) + 1; // the bar that is already sounding
       const p = S.patternsForBar(bar0, effective(at)[1], B);
       pulseRow(p.synth1); frictionRow(p.synth2); clangRow(p.clang); tickRow(p.tick); thudRow(p.thud); crackRow(p.crack);
     }
     applyMacros(effective(at));
-    eventId = transport.scheduleRepeat(onBar, "1m", "0:3:3"); // last 16th of each bar
+    if (!MANUAL) eventId = transport.scheduleRepeat(onBar, "1m", "0:3:3"); // last 16th of each bar
     loopId = setInterval(update, 33);
-    engine.play(at > 0 ? at : undefined);
+    engine.play(!MANUAL && at > 0 ? at : undefined);
   }
 
   // ── the performer ──────────────────────────────────────────
   function touch(i, value) {
     if (!running) return;
+    if (MANUAL) { man[i] = clamp(value); return; }
     hand.down[i] = true;
     hand.offset[i] = clamp(value - base()[i], -S.OFFSET_MAX, S.OFFSET_MAX);
   }
   function release(i) {
-    if (!hand.down[i]) return;
+    if (MANUAL || !hand.down[i]) return;
     hand.down[i] = false;
     hand.from[i] = hand.offset[i];
     hand.since[i] = performance.now();
@@ -231,6 +281,7 @@ export function createConductor({ store, engine }) {
 
   /** The catharsis can be called from bar 42 (S.B_ARM). Pressing fires it at the next bar start. */
   function pressBreak() {
+    if (MANUAL) return manualCut();
     const T = time();
     if (!running || pressed || T < S.B_ARM * S.BAR || T >= B * S.BAR - 0.3) return false;
     B = Math.max(Math.floor((T + 0.3) / S.BAR) + 1, S.B_ARM + 1);
@@ -238,6 +289,7 @@ export function createConductor({ store, engine }) {
     return true;
   }
   function breakState() {
+    if (MANUAL) return cutDone ? "fired" : running ? "armed" : "locked";
     const T = time();
     if (!running && !ended) return "locked";
     if (T >= B * S.BAR) return "fired";
@@ -250,17 +302,40 @@ export function createConductor({ store, engine }) {
     return {
       running, ended, T, B,
       base: base(T), macros: effective(T),
-      touched: hand.down.map((d, i) => d || Math.abs(hand.offset[i]) > 0.002),
+      manual: MANUAL, layers: { ...layers }, harmony: HARMONY[harmony][0], cut: cutDone,
+      touched: MANUAL ? [false, false, false] : hand.down.map((d, i) => d || Math.abs(hand.offset[i]) > 0.002),
       offset: hand.offset.slice(),
       breakState: breakState(),
       breakAt: B * S.BAR,
       endAt: S.endTime(B),
-      cue: running || ended ? S.cueAt(T, B) : "",
+      cue: !MANUAL && (running || ended) ? S.cueAt(T, B) : "",
     };
+  }
+
+  // ── manual actions ─────────────────────────────────────────
+  function toggleLayer(k) { if (running && !cutDone) layers[k] = !layers[k]; return layers[k]; }
+  function nextHarmony() { harmony = (harmony + 1) % HARMONY.length; chordBar = -99; return HARMONY[harmony][0]; }
+  /** A question from the score, now. n = 0, 1, 2. */
+  function playVoice(n) {
+    if (!running || !voice || cutDone) return;
+    const cue = S.VOICE_CUES[n];
+    voice.play(cue, Tone.now() + 0.05, TUNE);
+    S.WORD_CUES[n].t0 = transport.seconds + 0.3;
+  }
+  /** The catharsis by hand: everything cut at once, hum, the last phrase, the end. */
+  function manualCut() {
+    if (!running || cutDone) return false;
+    const t = Tone.now() + 0.05, T = transport.seconds;
+    cutDone = true;
+    B = T / S.BAR - S.CLIMAX_BARS; // so the screen's idea of "the cut" is now
+    cutAll(t);
+    bed.humFall(t + 6 * S.BAR, 2 * S.BAR);
+    finishTimer = setTimeout(finish, 8 * S.BAR * 1000 + 500);
+    return true;
   }
 
   /** After a TUNE change: write every macro-owned value again on the next tick. */
   function refresh() { lastValue = {}; }
 
-  return { start, reset, touch, release, pressBreak, status, refresh };
+  return { start, reset, touch, release, pressBreak, status, refresh, manual: MANUAL, toggleLayer, nextHarmony, playVoice };
 }

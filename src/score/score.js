@@ -299,7 +299,7 @@ export function riffMix(T, B) {
 // then nearer. They sit where the late fourth pulse would be, at the start of a bar.
 // Lines 1, 2, 8 are reversed recordings (used as they are). Line 11 is forward, after the cut.
 // ─────────────────────────────────────────────────────────────
-const VOICE_CUES = [
+export const VOICE_CUES = [
   { bar: 14, id: 1, dB: -3, room: 0.8, rate: 0.98, words: ["?detrats ti nehw", "em llet uoy naC"], dur: 4.6 }, // "Can you tell me when it started?" backwards, as the recording says it
   { bar: 22, id: 2, dB: 0, room: 1.0, rate: 0.99, words: ["?uoy ni ro ,moor eht", "ni dnuos eht sI"], dur: 7.4 },
   { bar: 32, id: 8, dB: 3, room: 1.4, rate: 1, words: ["?enola era uoy", "nehw reduol ti sI"], dur: 6.0 }, // nearer, brighter
