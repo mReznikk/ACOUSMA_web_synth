@@ -189,3 +189,19 @@ Design based on my prototype
 Complete source code and setup instructions.
 Verify that both synths work independently, every drum has its own channel, bus effects remain independent, tempo changes keep all patterns synchronized, repeated Play/Stop does not duplicate audio, and CUT silences feedback tails.
 The proof of concept is successful when a beginner can start a pattern, distinguish the two synth voices, shape a noise texture, and move between a sparse disturbing atmosphere and a mechanical industrial groove without using a piano interface.
+
+
+
+ДОРАБОТКИ
+
+что проосила сделать:
+
+Interface
+1. Remove small, uninformative grey labels, the time counter, the “Source — unidentified” text and other unclear elements.
+2. Explain what the unclear controls do, and remove anything that is not actually used.
+3. Bring back the Stop button and the simplified sequencer and drums.
+
+Visual concept
+4. Make questions form out of noise along the cardiogram-like waveform.
+5. Show the questions backwards (I supplied the exact reversed texts).
+
