@@ -85,14 +85,6 @@ body.is-perform { overflow: hidden; }
 .pv-fired .pv-breakbtn { border: 1.5px solid var(--black); background: var(--black); color: var(--white); opacity: 1; cursor: default; }
 
 
-/* TUNE panel */
-.pv-tune { margin-top: 4px; padding: 12px 0 0; border-top: 1px solid var(--black); display: flex; flex-direction: column; gap: 10px; }
-.pv-tune-head { display: flex; justify-content: space-between; align-items: center; }
-.pv-from { border: 1.5px solid var(--black); background: var(--white); height: 26px; font-size: 11px; font-family: var(--mono); padding: 0 6px; }
-.pv-knobs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px 20px; }
-.pv-knob { display: flex; flex-direction: column; gap: 6px; }
-.pv-knob input[type=range] { width: 100%; accent-color: #000; margin: 0; }
-.pv-tunebtn { position: absolute; right: 120px; bottom: 14px; border: 0; background: none; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: underline; cursor: pointer; opacity: 0.6; }
 
 /* SEQUENCER strip: 6 rows × 16 steps, four beat groups; the red column is the playhead */
 .pv-seq { display: flex; flex-direction: column; gap: 3px; }
@@ -109,3 +101,12 @@ body.is-perform { overflow: hidden; }
 .pv-flip { position: absolute; inset: 0; }
 .pv-disp.pv-back .pv-flip { transform: scaleX(-1); }
 .pv-dot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; border-radius: 50%; background: #e4261b; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+
+/* TUNE panel */
+.pv-tune { margin-top: 4px; padding: 12px 0 0; border-top: 1px solid var(--black); display: flex; flex-direction: column; gap: 10px; }
+.pv-tune-head { display: flex; justify-content: space-between; align-items: center; }
+.pv-from { border: 1.5px solid var(--black); background: var(--white); height: 26px; font-size: 11px; font-family: var(--mono); padding: 0 6px; }
+.pv-knobs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px 20px; }
+.pv-knob { display: flex; flex-direction: column; gap: 6px; }
+.pv-knob input[type=range] { width: 100%; accent-color: #000; margin: 0; }
+.pv-tunebtn { position: absolute; right: 120px; bottom: 14px; border: 0; background: none; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: underline; cursor: pointer; opacity: 0.6; }

@@ -59,7 +59,7 @@ export function performView({ conductor, engine, store }) {
     el("div", { class: "pv-identity" }, el("h1", {}, "ACOUSMA"), mark),
     cue, stopBtn, goBtn);
 
-  // ── SEQUENCER: what the score is playing this bar (read-only; the score rewrites it each bar) ──
+  // ── SEQUENCER: click a step to place it (manual mode) ──
   const ROWS = [
     ["Pulse", "synth1.pattern", (v) => v.map((x) => !!x.on)],
     ["Friction", "synth2.pattern", (v) => v.map((x) => !!x.on)],
@@ -70,6 +70,12 @@ export function performView({ conductor, engine, store }) {
   ].map(([name, path, read]) => {
     const cells = Array.from({ length: 16 }, () => el("i"));
     const paint = () => { const on = read(store.get(path) || []); cells.forEach((c, i) => c.classList.toggle("on", !!on[i])); };
+    if (conductor.manual) cells.forEach((c, i) => c.addEventListener("pointerdown", () => {
+      if (!conductor.status().running) return;
+      const synth = path.endsWith("pattern");
+      const key = synth ? `${path}.${i}.on` : `${path}.${i}`;
+      store.set(key, !store.get(key));
+    }));
     const row = el("div", { class: "pv-seqrow" }, el("span", { class: "pv-label" }, name),
       el("div", { class: "pv-cells" }, [0, 1, 2, 3].map((b) => el("div", { class: "pv-beat" }, cells.slice(b * 4, b * 4 + 4)))));
     paint();
@@ -130,6 +136,7 @@ export function performView({ conductor, engine, store }) {
   ];
   const startFrom = el("select", { class: "pv-from", "aria-label": "Start from" },
     ...[["0:00", 0], ["0:30", 30], ["1:15", 75], ["1:45", 105], ["2:10", 130]].map(([l, v]) => el("option", { value: v }, "from " + l)));
+  startFrom.hidden = conductor.manual;
   const knobEls = KNOBS.map(([k, name, unit, lo, hi, step, hint]) => {
     const val = el("span", { class: "pv-val" });
     const inp = el("input", { type: "range", min: lo, max: hi, step, value: TUNE[k], "aria-label": name });
@@ -143,7 +150,23 @@ export function performView({ conductor, engine, store }) {
   const tuneBtn = el("button", { type: "button", class: "pv-tunebtn", onclick: () => { tune.hidden = !tune.hidden; } }, "Tune");
   if (new URLSearchParams(location.search).get("tune") === "0") tune.hidden = true;
 
-  const root = el("div", { class: "pv-wrap" }, el("div", { class: "pv" }, top, disp, seq, rule, perform, tune, tuneBtn));
+  // ── LAYERS and VOICES (manual mode): everything is switched on by hand ──
+  let harmonyBtn;
+  const toggles = [];
+  const mk = (txt, fn, key) => { const b = el("button", { type: "button", class: "pv-tog", onclick: () => fn(b) }, txt); if (key) toggles.push([key, b]); return b; };
+  const layersEl = el("section", { class: "pv-layers", "aria-label": "Layers" },
+    el("span", { class: "pv-label" }, "Layers"),
+    mk("Bed", () => conductor.toggleLayer("bed"), "bed"),
+    mk("Pad", () => conductor.toggleLayer("pad"), "pad"),
+    mk("Melody", () => conductor.toggleLayer("lead"), "lead"),
+    mk("Bass", () => conductor.toggleLayer("riff"), "riff"),
+    (harmonyBtn = mk("Hollow", (b) => { b.textContent = conductor.nextHarmony(); })),
+    el("span", { class: "pv-label pv-gapl" }, "Voice"),
+    mk("1", () => conductor.playVoice(0)), mk("2", () => conductor.playVoice(1)), mk("3", () => conductor.playVoice(2)));
+  layersEl.hidden = !conductor.manual;
+  rule.hidden = conductor.manual;
+
+  const root = el("div", { class: "pv-wrap" }, el("div", { class: "pv" }, top, disp, seq, layersEl, rule, perform, tune, tuneBtn));
 
   // ── scale to any window: reference frame 1440 × 810 ──
   const fit = () => {
@@ -298,6 +321,9 @@ export function performView({ conductor, engine, store }) {
     veil.style.width = w * 100 + "%";
     ghost.style.opacity = String(0.22 * (1 - 0.45 * clamp((s.T - tb) / (s.endAt - tb))));
 
+    // layers
+    for (const [k, b] of toggles) b.classList.toggle("on", !!s.layers[k]);
+    if (s.manual && harmonyBtn.textContent !== s.harmony) harmonyBtn.textContent = s.harmony;
     // header
     cue.textContent = s.cue;
     const idle = !s.running && !s.ended;
