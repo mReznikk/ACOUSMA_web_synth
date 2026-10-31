@@ -9,6 +9,7 @@
 //   fresh   the newest 0.4 s of the line, in red, only while something sounds
 //   frame   baseline and ticks, in front of everything (the frame continues behind the veil)
 import { el } from "./controls.js";
+import { TUNE } from "../audio/macros.js";
 import { BAR, WORD_CUES, FINAL_LINE, CLIMAX_BARS } from "../score/score.js";
 import { createWords } from "./words.js";
 
@@ -58,7 +59,7 @@ export function performView({ conductor, engine, store }) {
     el("div", { class: "pv-identity" }, el("h1", {}, "ACOUSMA"), mark),
     cue, stopBtn, goBtn);
 
-  // ── SEQUENCER: what the score is playing this bar (read-only; the score rewrites it each bar) ──
+  // ── SEQUENCER: click a step to place it (manual mode) ──
   const ROWS = [
     ["Pulse", "synth1.pattern", (v) => v.map((x) => !!x.on)],
     ["Friction", "synth2.pattern", (v) => v.map((x) => !!x.on)],
@@ -69,6 +70,12 @@ export function performView({ conductor, engine, store }) {
   ].map(([name, path, read]) => {
     const cells = Array.from({ length: 16 }, () => el("i"));
     const paint = () => { const on = read(store.get(path) || []); cells.forEach((c, i) => c.classList.toggle("on", !!on[i])); };
+    if (conductor.manual) cells.forEach((c, i) => c.addEventListener("pointerdown", () => {
+      if (!conductor.status().running) return;
+      const synth = path.endsWith("pattern");
+      const key = synth ? `${path}.${i}.on` : `${path}.${i}`;
+      store.set(key, !store.get(key));
+    }));
     const row = el("div", { class: "pv-seqrow" }, el("span", { class: "pv-label" }, name),
       el("div", { class: "pv-cells" }, [0, 1, 2, 3].map((b) => el("div", { class: "pv-beat" }, cells.slice(b * 4, b * 4 + 4)))));
     paint();
@@ -108,7 +115,58 @@ export function performView({ conductor, engine, store }) {
 
   const perform = el("section", { class: "pv-perform" }, ...macroEls.map((m) => m.root), breakEl);
 
-  const root = el("div", { class: "pv-wrap" }, el("div", { class: "pv" }, top, disp, seq, rule, perform));
+  // ── TUNE: live sound settings (concept phase). Change while it plays; nothing is saved. ──
+  const KNOBS = [
+    ["bed", "Bed", "dB", -34, -6, 0.5, "the throbbing low saws"],
+    ["pad", "Pad", "dB", -34, -2, 0.5, "the chord instrument"],
+    ["lead", "Melody", "dB", -40, -4, 0.5, "the quiet melodic texture"],
+    ["wall", "Melody room", "Hz", 150, 2500, 10, "how muffled the melody is: lower = further away"],
+    ["riff", "Rubber bass", "dB", -34, 0, 0.5, "the rubber bass that emerges after 1:30"],
+    ["riffBright", "Bass tone", "Hz", 300, 3000, 25, "bass filter cutoff at full (resonant)"],
+    ["leadBright", "Melody tone", "Hz", 500, 3000, 50, "how bright the lead gets at its brightest"],
+    ["throb", "Throb", "", 0, 1, 0.01, "depth of the pulse in bed and pad"],
+    ["voice", "Voice", "dB", -40, -2, 0.5, "the reversed questions"],
+    ["voiceRoom", "Voice room", "Hz", 400, 4000, 25, "how muffled the reversed voice is: lower = further away"],
+    ["voiceEnd", "Last line", "dB", -30, 0, 0.5, "the last phrase after the cut"],
+    ["hum", "Hum", "dB", -34, -4, 0.5, "the low hum after the cut"],
+    ["muffle", "Muffle", "Hz", 1200, 12000, 100, "low-pass over everything: lower = darker, more muted"],
+    ["bright", "Pulse tone", "", 0.39, 0.83, 0.01, "top of the bass-pulse tone sweep"],
+    ["drums", "Drums", "dB", -12, 6, 0.5, "all drums"],
+    ["grit", "Grit", "", 0, 1.5, 0.01, "distortion and crush"],
+  ];
+  const startFrom = el("select", { class: "pv-from", "aria-label": "Start from" },
+    ...[["0:00", 0], ["0:30", 30], ["1:15", 75], ["1:45", 105], ["2:10", 130]].map(([l, v]) => el("option", { value: v }, "from " + l)));
+  startFrom.hidden = conductor.manual;
+  const knobEls = KNOBS.map(([k, name, unit, lo, hi, step, hint]) => {
+    const val = el("span", { class: "pv-val" });
+    const inp = el("input", { type: "range", min: lo, max: hi, step, value: TUNE[k], "aria-label": name });
+    const paint = () => { val.textContent = (+TUNE[k]).toFixed(step < 0.1 ? 2 : step < 1 ? 1 : 0) + (unit ? " " + unit : ""); };
+    inp.addEventListener("input", () => { TUNE[k] = +inp.value; paint(); conductor.refresh(); });
+    paint();
+    return el("label", { class: "pv-knob", title: hint }, el("span", { class: "pv-mhead" }, el("span", { class: "pv-label" }, name), val), inp);
+  });
+  const tune = el("section", { class: "pv-tune", "aria-label": "Sound tuning" },
+    el("div", { class: "pv-tune-head" }, el("span", { class: "pv-label" }, "Tune"), startFrom), el("div", { class: "pv-knobs" }, ...knobEls));
+  const tuneBtn = el("button", { type: "button", class: "pv-tunebtn", onclick: () => { tune.hidden = !tune.hidden; } }, "Tune");
+  if (new URLSearchParams(location.search).get("tune") === "0") tune.hidden = true;
+
+  // ── LAYERS and VOICES (manual mode): everything is switched on by hand ──
+  let harmonyBtn;
+  const toggles = [];
+  const mk = (txt, fn, key) => { const b = el("button", { type: "button", class: "pv-tog", onclick: () => fn(b) }, txt); if (key) toggles.push([key, b]); return b; };
+  const layersEl = el("section", { class: "pv-layers", "aria-label": "Layers" },
+    el("span", { class: "pv-label" }, "Layers"),
+    mk("Bed", () => conductor.toggleLayer("bed"), "bed"),
+    mk("Pad", () => conductor.toggleLayer("pad"), "pad"),
+    mk("Melody", () => conductor.toggleLayer("lead"), "lead"),
+    mk("Bass", () => conductor.toggleLayer("riff"), "riff"),
+    (harmonyBtn = mk("Hollow", (b) => { b.textContent = conductor.nextHarmony(); })),
+    el("span", { class: "pv-label pv-gapl" }, "Voice"),
+    mk("1", () => conductor.playVoice(0)), mk("2", () => conductor.playVoice(1)), mk("3", () => conductor.playVoice(2)));
+  layersEl.hidden = !conductor.manual;
+  rule.hidden = conductor.manual;
+
+  const root = el("div", { class: "pv-wrap" }, el("div", { class: "pv" }, top, disp, seq, layersEl, rule, perform, tune, tuneBtn));
 
   // ── scale to any window: reference frame 1440 × 810 ──
   const fit = () => {
@@ -263,8 +321,15 @@ export function performView({ conductor, engine, store }) {
     veil.style.width = w * 100 + "%";
     ghost.style.opacity = String(0.22 * (1 - 0.45 * clamp((s.T - tb) / (s.endAt - tb))));
 
+    // layers
+    for (const [k, b] of toggles) b.classList.toggle("on", !!s.layers[k]);
+    if (s.manual && harmonyBtn.textContent !== s.harmony) harmonyBtn.textContent = s.harmony;
     // header
     cue.textContent = s.cue;
+    if (s.manual && s.running && !s.cut) {
+      const any = Object.values(s.layers).some(Boolean) || ROWS.some((r) => r.cells.some((c) => c.classList.contains("on")));
+      if (!any) cue.textContent = "Silence. Click the steps, switch the layers on.";
+    }
     const idle = !s.running && !s.ended;
     goBtn.textContent = idle ? "Start" : "Restart";
 
@@ -306,7 +371,7 @@ export function performView({ conductor, engine, store }) {
     goBtn.disabled = true;
     try {
       if (s.running || s.ended) await conductor.reset();
-      await conductor.start(0);
+      await conductor.start(+startFrom.value);
     } finally { starting = false; goBtn.disabled = false; }
   });
 
